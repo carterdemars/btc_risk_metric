@@ -46,8 +46,8 @@ def import_data(urls, api_key):
     # join all data into one dataframe
     data_df = data_df.join(df)
 
-    return data_df.drop(data_df.index[data_df.index < datetime(2012, 1, 1)])
-    #return data_df
+    #return data_df.drop(data_df.index[data_df.index < datetime(2012, 1, 1)])
+    return data_df
 
 def calculate_extension(df):
     # extension from 20 week sma/21 week ema
@@ -66,23 +66,23 @@ def calculate_extension(df):
     below.rename('extension', inplace=True)
     neutral.rename('extension', inplace=True)
 
-    return pd.concat([df, pd.concat([above, below, neutral], axis=0)], axis=1)
+    return pd.concat([above, below, neutral], axis=0)
 
 
 # RESCALING FUNCTIONS
 def rescale_sopr(x):
-    if x > 1.0:
-        x = 1.0
-    elif x < -1.0:
-        x = -1.0
+    if x > 0.6:
+        x = 0.6
+    elif x < -0.8:
+        x = -0.8
     return x
 
 
 def rescale_extension(x):
     if x > 2:
         x = 2
-    if x < -1:
-        x = -1
+    elif x < -1.1:
+        x = 1.1
     return x
 
 def rescale_fair_value(fair_value_extension):
@@ -105,13 +105,18 @@ def objective(x, a, b, c, d):
     return a * np.log(b * x + c) + d
 
 
-def logarithmic_regression(y_data):
-    x_values = [x + 1 for x in range(len(y_data))]
+def logarithmic_regression(y_data, index=None, df_index=None):
+
+    x_values = [x + 1 for x in range(len(y_data))] if index is None else [i+1 for i in index]
     y_values = np.log(y_data)
 
-    popt, _ = curve_fit(objective, x_values, y_values, bounds=((0, 0, 0, -np.inf), (np.inf, 100, 100, np.inf)))
+    popt, _ = curve_fit(objective, x_values, y_values, p0=(5, 0.5, 70, -15), bounds=((0, 0, 0, -1000), (100, 100, 10000, 1000)))
+    #print(popt)
+    if df_index is None:
+        return np.exp(objective(np.array(x_values), popt[0], popt[1], popt[2], popt[3]))
 
-    return np.exp(objective(np.array(x_values), popt[0], popt[1], popt[2], popt[3]))
+    return np.exp(objective(np.array([x + 1 for x in range(len(df_index))]), popt[0], popt[1], popt[2], popt[3]))
+
 
 
 def fair_value_regression(df):
@@ -141,6 +146,7 @@ def fair_value_regression(df):
     plt.tight_layout()
 
     plt.savefig('figs//fair_value_regression_band.png', dpi=300)
+    #plt.show()
     plt.close()
 
     return fair_value
@@ -159,7 +165,7 @@ def regression_bands(df):
     # plot regression bands
     fair_value = logarithmic_regression(df['close'])
 
-    for i in [-0.5, 0, 0.5, 1, 1.5, 2]:
+    for i in [-0.5, 0, 0.5, 1, 1.5, 2, 2.5]:
         ax1.plot(df.index, fair_value * np.exp(i), lw=0.5)
         plt.fill_between(df.index, fair_value * np.exp(i - 0.5), fair_value * np.exp(i), alpha=0.4)
 
@@ -176,36 +182,10 @@ def fair_value_extension(df, fair_value):
     fv_extension = rescale_fair_value(fv_extension)
     fv_extension = preprocessing.MinMaxScaler().fit_transform(np.array(fv_extension).reshape(-1, 1))[:, 0]
 
-    # fig, (ax1, ax2) = plt.subplots(1, 2)
-    # fig.set_figheight(5)
-    # fig.set_figwidth(10)
-    #
-    # ax1.set_title("Bitcoin Long Term Accumulation Zones")
-    # ax1.set_xlabel('Date')
-    # ax1.set_yscale('log')
-    # ax1.set_ylabel('Price')
-    #
-    # ax2.set_title('Long Term Risk Metric')
-    # ax2.set_xlabel('Date')
-    #
-    # colour_map = plt.cm.get_cmap('RdYlGn').reversed()
-    # ax1.scatter(df.index, df['close'], c=fv_extension, cmap=colour_map)
-    #
-    # for i in np.linspace(0.1, 1.0, 10):
-    #
-    #     if round(i, 2) <= 0.3:
-    #         colour = 'green'
-    #     elif round(i, 2) >= 0.7:
-    #         colour = 'red'
-    #     else:
-    #         colour = 'yellow'
-    #
-    #     ax2.fill_between(df.index, i - 0.1, i, alpha=abs(i - 0.5), color=colour)
-    #
-    # ax2.plot(df.index, fv_extension, color='white', alpha= 0.5)
-    # plt.savefig('figs//Bitcoin Long Term Accumulation Zones')
-    # plt.close()
     return fv_extension
+
+def sma_200_extension(df, sma_200):
+    return (df['close']/sma_200).apply(lambda value: value - 1)
 
 def long_term_risk_metric(df, accumulation_score):
     fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -236,5 +216,6 @@ def long_term_risk_metric(df, accumulation_score):
 
     ax2.plot(df.index, accumulation_score, color='white', alpha=0.5)
     plt.savefig('figs//Bitcoin Long Term Accumulation Zones')
+    plt.show()
     plt.close()
 
