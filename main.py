@@ -10,7 +10,7 @@ import math
 from scipy.optimize import curve_fit
 from sklearn import preprocessing
 from auxiliary_functions import rescale_sopr, rescale_extension, calculate_extension, regression_bands, \
-    fair_value_regression, fair_value_extension, import_data, rescale_fair_value
+    fair_value_regression, fair_value_extension, import_data, rescale_fair_value, long_term_risk_metric
 
 
 pd.set_option("display.max_columns", None)
@@ -64,7 +64,7 @@ def main():
 
     # process sopr values
     df['sopr'] = preprocessing.StandardScaler().fit_transform(df['sopr'].values.reshape(-1, 1))[:, 0]
-    df['sopr'] = df['sopr'].rolling(60).mean().apply(rescale_sopr)
+    df['sopr'] = df['sopr'].rolling(50).mean().apply(rescale_sopr)
     df['sopr'] = preprocessing.MinMaxScaler().fit_transform(df['sopr'].values.reshape(-1, 1))[:, 0]
 
     # process extension values
@@ -79,49 +79,48 @@ def main():
     #             "Accumulation Score")
 
 
-
     # LONG TERM BTC OUTLOOK (1 YEAR +)
 
     regression_bands(df)
     fair_value = pd.Series(fair_value_regression(df), index=df.index)
-    fair_value_extension(df, fair_value)
+    fve = fair_value_extension(df, fair_value)
 
-
-    # OTHER PLOTTING
-
-    fig, ax1 = plt.subplots()
-
-    ax2 = ax1.twinx()
-
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('Price')
-    ax2.set_ylabel('Accumulation Score')
+    #
+    # # OTHER PLOTTING
+    #
+    # fig, ax1 = plt.subplots()
+    #
+    # ax2 = ax1.twinx()
+    #
+    # ax1.set_xlabel('Date')
+    # ax1.set_ylabel('Price')
+    # ax2.set_ylabel('Accumulation Score')
     #plt.xlim(datetime(2019,1,1), datetime.today() + timedelta(days=30))
     #plt.ylim(0.5*df[df.index > datetime(2019,1,1)]['close'].min(), 1.25*df[df.index > datetime(2019,1,1)]['close'].max())
-    accumulation_score = (df['sopr'] + df['extension'] + df['fear_and_greed']) / 3.0
-    accumulation_score[df['fear_and_greed'].isna()] = (df['sopr'] + df['extension']) / 2.0
+    accumulation_score = (df['sopr'] + df['extension'] + df['fear_and_greed'] + fve) / 4.0
+    accumulation_score[df['fear_and_greed'].isna()] = (df['sopr'] + df['extension'] + fve) / 3.0
+    long_term_risk_metric(df, accumulation_score)
 
 
 
-
-    #accumulation_score = df['fear_and_greed']
-    plt.title("Long Term Bitcoin Accumulation Zones")
-    colour_map = plt.cm.get_cmap('RdYlGn').reversed()
-    ax1.scatter(df.index, df['close'], c=accumulation_score, cmap=colour_map)
-    #ax2.plot(accumulation_score)
-    #plt.plot(df.index, df['sma20'], color='purple')
-    #plt.plot(df.index, df['ema21'], color='black')
-    #plt.plot()
-    #fig.colorbar()
-    # ax1.plot(df['close'].rolling(200*7).mean(), color='black')
-    # ax2.plot(df['close']/df['close'].rolling(200*7).mean())
-    #ax1.plot(df.index, fair_value)
-    plt.xticks(rotation=50)
-    plt.tight_layout()
-    ax1.set_yscale('log')
-    plt.savefig("figs//BTC Long Term Accumulation Zones.png")
-    plt.show()
-    return
+    # #accumulation_score = df['fear_and_greed']
+    # plt.title("Long Term Bitcoin Accumulation Zones")
+    # colour_map = plt.cm.get_cmap('RdYlGn').reversed()
+    # ax1.scatter(df.index, df['close'], c=accumulation_score, cmap=colour_map)
+    # ax2.plot(accumulation_score)
+    # #plt.plot(df.index, df['sma20'], color='purple')
+    # #plt.plot(df.index, df['ema21'], color='black')
+    # #plt.plot()
+    # #fig.colorbar()
+    # # ax1.plot(df['close'].rolling(200*7).mean(), color='black')
+    # # ax2.plot(df['close']/df['close'].rolling(200*7).mean())
+    # #ax1.plot(df.index, fair_value)
+    # plt.xticks(rotation=50)
+    # plt.tight_layout()
+    # ax1.set_yscale('log')
+    # plt.savefig("figs//BTC Long Term Accumulation Zones.png")
+    # plt.show()
+    # return
     #print(np.percentile(df['sopr'].dropna(), 98), np.percentile(df['sopr'].dropna(), 2))
     # plt.scatter(df.index, df['close'], color='orange')
     #
@@ -161,4 +160,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    print('done')

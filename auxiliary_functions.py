@@ -81,6 +81,8 @@ def rescale_sopr(x):
 def rescale_extension(x):
     if x > 2:
         x = 2
+    if x < -1:
+        x = -1
     return x
 
 def rescale_fair_value(fair_value_extension):
@@ -174,9 +176,41 @@ def fair_value_extension(df, fair_value):
     fv_extension = rescale_fair_value(fv_extension)
     fv_extension = preprocessing.MinMaxScaler().fit_transform(np.array(fv_extension).reshape(-1, 1))[:, 0]
 
+    # fig, (ax1, ax2) = plt.subplots(1, 2)
+    # fig.set_figheight(5)
+    # fig.set_figwidth(10)
+    #
+    # ax1.set_title("Bitcoin Long Term Accumulation Zones")
+    # ax1.set_xlabel('Date')
+    # ax1.set_yscale('log')
+    # ax1.set_ylabel('Price')
+    #
+    # ax2.set_title('Long Term Risk Metric')
+    # ax2.set_xlabel('Date')
+    #
+    # colour_map = plt.cm.get_cmap('RdYlGn').reversed()
+    # ax1.scatter(df.index, df['close'], c=fv_extension, cmap=colour_map)
+    #
+    # for i in np.linspace(0.1, 1.0, 10):
+    #
+    #     if round(i, 2) <= 0.3:
+    #         colour = 'green'
+    #     elif round(i, 2) >= 0.7:
+    #         colour = 'red'
+    #     else:
+    #         colour = 'yellow'
+    #
+    #     ax2.fill_between(df.index, i - 0.1, i, alpha=abs(i - 0.5), color=colour)
+    #
+    # ax2.plot(df.index, fv_extension, color='white', alpha= 0.5)
+    # plt.savefig('figs//Bitcoin Long Term Accumulation Zones')
+    # plt.close()
+    return fv_extension
+
+def long_term_risk_metric(df, accumulation_score):
     fig, (ax1, ax2) = plt.subplots(1, 2)
     fig.set_figheight(5)
-    fig.set_figwidth(10)
+    fig.set_figwidth(14)
 
     ax1.set_title("Bitcoin Long Term Accumulation Zones")
     ax1.set_xlabel('Date')
@@ -187,7 +221,7 @@ def fair_value_extension(df, fair_value):
     ax2.set_xlabel('Date')
 
     colour_map = plt.cm.get_cmap('RdYlGn').reversed()
-    ax1.scatter(df.index, df['close'], c=fv_extension, cmap=colour_map)
+    ax1.scatter(df.index, df['close'], c=accumulation_score, cmap=colour_map)
 
     for i in np.linspace(0.1, 1.0, 10):
 
@@ -200,7 +234,7 @@ def fair_value_extension(df, fair_value):
 
         ax2.fill_between(df.index, i - 0.1, i, alpha=abs(i - 0.5), color=colour)
 
-    ax2.plot(df.index, fv_extension, color='white', alpha= 0.5)
+    ax2.plot(df.index, accumulation_score, color='white', alpha=0.5)
     plt.savefig('figs//Bitcoin Long Term Accumulation Zones')
     plt.close()
 
