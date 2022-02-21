@@ -219,3 +219,22 @@ def long_term_risk_metric(df, accumulation_score):
     plt.show()
     plt.close()
 
+
+import time
+# from time import sleep
+import twilio
+
+
+
+def send_message(metric_value, btc_price):
+
+    from twilio.rest import Client
+    account_sid = "AC813c346154a1f991a3c2ddc7b062b63e"
+    auth_token = '096d71148edf0f953d5062ecccb63005'
+    client = Client(account_sid, auth_token)
+    message = client.messages.create(
+        body=f"BTC Accumulation Metric is at {metric_value} and with a price of {btc_price}",
+        from_="+18608912019",
+        to="+16133242526"
+    )
+    print(message.sid)

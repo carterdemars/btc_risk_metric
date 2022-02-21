@@ -11,7 +11,7 @@ from scipy.optimize import curve_fit
 from sklearn import preprocessing
 from auxiliary_functions import rescale_sopr, rescale_extension, calculate_extension, regression_bands, \
     fair_value_regression, fair_value_extension, import_data, long_term_risk_metric, logarithmic_regression, \
-    sma_200_extension
+    sma_200_extension, send_message
 
 
 pd.set_option("display.max_columns", None)
@@ -57,6 +57,9 @@ def main():
     df = import_data(urls, API_KEY)
     df = pd.concat([df, calculate_extension(df)], axis=1)
     plt.style.use("dark_background")
+    # print(date.today())
+    # print(df)
+
 
     # process sopr values
     df['sopr'] = preprocessing.StandardScaler().fit_transform(df['sopr'].values.reshape(-1, 1))[:, 0]
@@ -157,10 +160,18 @@ def main():
     plt.xticks(rotation=50)
     plt.tight_layout()
 
-    #plt.savefig('figs//fair_value_regression_band.png', dpi=300)
-    plt.show()
+    plt.savefig('figs//over_under_valuation_regression_bands.png', dpi=300)
+    #plt.show()
     plt.close()
 
+    todays_score = (accumulation_score.loc[accumulation_score.index == pd.to_datetime(date.today())]).values[0]
+    todays_close = df.loc[df.index == pd.to_datetime(date.today())]['close'].values[0]
+
+    # if todays_score < 0.3:
+    #     send_message(round(todays_score, 3), round(todays_close))
+
+
+    print('done')
 
 
 
