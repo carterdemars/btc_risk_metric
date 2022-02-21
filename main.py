@@ -5,8 +5,13 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import math
+from scipy.optimize import curve_fit
 from sklearn import preprocessing
-from auxiliary_functions import rescale_sopr, rescale_extension, calculate_extension
+from auxiliary_functions import rescale_sopr, rescale_extension, calculate_extension, regression_bands, \
+    fair_value_regression, fair_value_extension, import_data, rescale_fair_value
+
 
 pd.set_option("display.max_columns", None)
 
@@ -45,57 +50,17 @@ def plot_figure(y_range, x_data, y_data, title):
 #     fig.update_yaxes(type="log")
 #     fig.show()
 
-def import_data():
 
-    data = []
-    for url in urls:
-        label = url.split('/')[-1]
-
-        # make API request
-        res = requests.get(url, params={'a': 'BTC', 'api_key': API_KEY})
-
-        # convert to dataframe
-        df = pd.read_json(res.text, convert_dates=['t'])
-        df.set_index('t', inplace=True)
-        df.index.rename('date', inplace=True)
-        df.rename(columns={'v': label}, inplace=True)
-        data.append(df)
-
-    data_df = pd.concat(data, axis=1)
-
-    # split open, close, high, low data into individual columns
-    close = pd.Series([value['c'] for value in data_df['o']], index=data_df.index, name='close')
-    open = pd.Series([value['o'] for value in data_df['o']], index=data_df.index, name='open')
-    high = pd.Series([value['h'] for value in data_df['o']], index=data_df.index, name='high')
-    low = pd.Series([value['l'] for value in data_df['o']], index=data_df.index, name='low')
-    data_df = data_df.join(pd.concat([open, close, high, low], axis=1))
-    data_df.drop('o', axis=1, inplace=True)
-
-    # get fear and greed index data
-    res = requests.get('https://api.alternative.me/fng/?limit=0')
-
-    fng_values = [int(value['value']) for value in json.loads(res.text)['data']]
-    fng_dates = pd.Series([int(value['timestamp']) for value in json.loads(res.text)['data']])
-    fng_dates = fng_dates.apply(datetime.fromtimestamp).apply(datetime.date)
-    df = pd.DataFrame(fng_values, index=fng_dates, columns=["fear_and_greed"])
-
-    # join all data into one dataframe
-    data_df = data_df.join(df)
-
-    return data_df.drop(data_df.index[data_df.index < datetime(2012, 1, 1)])
 
 
 
 
 def main():
 
-    df = import_data()
+    df = import_data(urls, API_KEY)
 
     df = calculate_extension(df)
-    print(df)
 
-
-    #print(df)
 
     # process sopr values
     df['sopr'] = preprocessing.StandardScaler().fit_transform(df['sopr'].values.reshape(-1, 1))[:, 0]
@@ -107,25 +72,56 @@ def main():
     df['extension'] = df['extension'].apply(rescale_extension)
     df['extension'] = preprocessing.MinMaxScaler().fit_transform(df['extension'].values.reshape(-1, 1))[:, 0]
 
+    # process fear and green index values
+    df['fear_and_greed'] = df['fear_and_greed'].apply(lambda x: x/100.0).ewm(span=50, adjust=False).mean()
 
     # plot_figure([accumulation_score.min(), accumulation_score.max()], accumulation_score.dropna().index, accumulation_score.dropna(),
     #             "Accumulation Score")
 
 
-    plt.xlim(datetime(2019,1,1), datetime.today() + timedelta(days=30))
-    plt.ylim(0.5*df[df.index > datetime(2019,1,1)]['close'].min(), 1.25*df[df.index > datetime(2019,1,1)]['close'].max())
-    accumulation_score = (df['sopr'] + df['extension']) / 2
+
+    # LONG TERM BTC OUTLOOK (1 YEAR +)
+
+    regression_bands(df)
+    fair_value = pd.Series(fair_value_regression(df), index=df.index)
+    fair_value_extension(df, fair_value)
+
+
+    # OTHER PLOTTING
+
+    fig, ax1 = plt.subplots()
+
+    ax2 = ax1.twinx()
+
+    ax1.set_xlabel('Date')
+    ax1.set_ylabel('Price')
+    ax2.set_ylabel('Accumulation Score')
+    #plt.xlim(datetime(2019,1,1), datetime.today() + timedelta(days=30))
+    #plt.ylim(0.5*df[df.index > datetime(2019,1,1)]['close'].min(), 1.25*df[df.index > datetime(2019,1,1)]['close'].max())
+    accumulation_score = (df['sopr'] + df['extension'] + df['fear_and_greed']) / 3.0
+    accumulation_score[df['fear_and_greed'].isna()] = (df['sopr'] + df['extension']) / 2.0
+
+
+
+
+    #accumulation_score = df['fear_and_greed']
     plt.title("Long Term Bitcoin Accumulation Zones")
     colour_map = plt.cm.get_cmap('RdYlGn').reversed()
-    plt.scatter(df.index, df['close'], c=accumulation_score, cmap=colour_map)
-    plt.plot(df.index, df['sma20'], color='purple')
-    plt.plot(df.index, df['ema21'], color='black')
-    plt.colorbar()
+    ax1.scatter(df.index, df['close'], c=accumulation_score, cmap=colour_map)
+    #ax2.plot(accumulation_score)
+    #plt.plot(df.index, df['sma20'], color='purple')
+    #plt.plot(df.index, df['ema21'], color='black')
+    #plt.plot()
+    #fig.colorbar()
+    # ax1.plot(df['close'].rolling(200*7).mean(), color='black')
+    # ax2.plot(df['close']/df['close'].rolling(200*7).mean())
+    #ax1.plot(df.index, fair_value)
     plt.xticks(rotation=50)
     plt.tight_layout()
-    #plt.gca().set_yscale('log')
-    plt.savefig("BTC Long Term Accumulation Zones.png")
+    ax1.set_yscale('log')
+    plt.savefig("figs//BTC Long Term Accumulation Zones.png")
     plt.show()
+    return
     #print(np.percentile(df['sopr'].dropna(), 98), np.percentile(df['sopr'].dropna(), 2))
     # plt.scatter(df.index, df['close'], color='orange')
     #
