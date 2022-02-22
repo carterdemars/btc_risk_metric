@@ -171,7 +171,9 @@ def main():
     #     send_message(round(todays_score, 3), round(todays_close))
 
 
-    print('done')
+    #print('done')
+    return [accumulation_score.loc[accumulation_score.index > pd.to_datetime(date(2016,1,1))],
+            df.loc[df.index > pd.to_datetime(date(2016,1,1))][['open', 'high', 'low', 'close']]]
 
 
 

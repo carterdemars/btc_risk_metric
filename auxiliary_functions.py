@@ -216,13 +216,9 @@ def long_term_risk_metric(df, accumulation_score):
 
     ax2.plot(df.index, accumulation_score, color='white', alpha=0.5)
     plt.savefig('figs//Bitcoin Long Term Accumulation Zones')
-    plt.show()
+    #plt.show()
     plt.close()
 
-
-import time
-# from time import sleep
-import twilio
 
 
 
